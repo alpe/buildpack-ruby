@@ -2,18 +2,10 @@ require "tmpdir"
 require "rubygems"
 require "language_pack"
 require "language_pack/base"
+require_relative "../../configs"
 
 # base Ruby Language Pack. This is for any base ruby app.
 class LanguagePack::Ruby < LanguagePack::Base
-  LIBYAML_VERSION     = "0.1.4"
-  LIBYAML_PATH        = "libyaml-#{LIBYAML_VERSION}"
-  BUNDLER_VERSION     = "1.2.1"
-  BUNDLER_GEM_PATH    = "bundler-#{BUNDLER_VERSION}"
-  NODE_VERSION        = "0.4.7"
-  NODE_JS_BINARY_PATH = "node-#{NODE_VERSION}"
-  JVM_BASE_URL        = "http://heroku-jvm-langpack-java.s3.amazonaws.com"
-  JVM_VERSION         = "openjdk7-latest"
-
   # detects if this is a valid Ruby app
   # @return [Boolean] true if it's a Ruby app
   def self.use?
@@ -25,7 +17,7 @@ class LanguagePack::Ruby < LanguagePack::Base
   end
 
   def default_addons
-    add_shared_database_addon
+    heroku_add_shared_database_addon if Configs::paas_vendor == :heroku
   end
 
   def default_config_vars
@@ -55,7 +47,7 @@ class LanguagePack::Ruby < LanguagePack::Base
     allow_git do
       install_language_pack_gems
       build_bundler
-      create_database_yml
+      heroku_create_database_yml if Configs::paas_vendor == :heroku
       install_binaries
       run_assets_precompile_rake_task
     end
@@ -130,7 +122,7 @@ private
   def bootstrap_bundler(&block)
     Dir.mktmpdir("bundler-") do |tmpdir|
       Dir.chdir(tmpdir) do
-        run("curl #{VENDOR_URL}/#{BUNDLER_GEM_PATH}.tgz -s -o - | tar xzf -")
+        run("curl #{Configs::VENDOR_URL}/#{Configs::BUNDLER_GEM_PATH}.tgz -s -o - | tar xzf -")
       end
 
       yield tmpdir
@@ -169,7 +161,7 @@ private
 
     Dir.mktmpdir("ruby_versions-") do |tmpdir|
       Dir.chdir(tmpdir) do
-        run("curl -O #{VENDOR_URL}/ruby_versions.yml")
+        run("curl -O #{Configs::VENDOR_URL}/ruby_versions.yml")
         @ruby_versions = YAML::load_file("ruby_versions.yml")
       end
     end
@@ -220,14 +212,14 @@ ERROR
       FileUtils.mkdir_p(build_ruby_path)
       Dir.chdir(build_ruby_path) do
         ruby_vm = ruby_version_rbx? ? "rbx" : "ruby"
-        run("curl #{VENDOR_URL}/#{ruby_version.sub(ruby_vm, "#{ruby_vm}-build")}.tgz -s -o - | tar zxf -")
+        run("curl #{Configs::VENDOR_URL}/#{ruby_version.sub(ruby_vm, "#{ruby_vm}-build")}.tgz -s -o - | tar zxf -")
       end
       error invalid_ruby_version_message unless $?.success?
     end
 
     FileUtils.mkdir_p(slug_vendor_ruby)
     Dir.chdir(slug_vendor_ruby) do
-      run("curl #{VENDOR_URL}/#{ruby_version}.tgz -s -o - | tar zxf -")
+      run("curl #{Configs::VENDOR_URL}/#{ruby_version}.tgz -s -o - | tar zxf -")
     end
     error invalid_ruby_version_message unless $?.success?
 
@@ -251,11 +243,11 @@ ERROR
   # vendors JVM into the slug for JRuby
   def install_jvm
     if ruby_version_jruby?
-      topic "Installing JVM: #{JVM_VERSION}"
+      topic "Installing JVM: #{Configs::JVM_VERSION}"
 
       FileUtils.mkdir_p(slug_vendor_jvm)
       Dir.chdir(slug_vendor_jvm) do
-        run("curl #{JVM_BASE_URL}/#{JVM_VERSION}.tar.gz -s -o - | tar xzf -")
+        run("curl #{Configs::JVM_BASE_URL}/#{Configs::JVM_VERSION}.tar.gz -s -o - | tar xzf -")
       end
 
       bin_dir = "bin"
@@ -291,7 +283,7 @@ ERROR
   # list of default gems to vendor into the slug
   # @return [Array] resulting list of gems
   def gems
-    [BUNDLER_GEM_PATH]
+    [Configs::BUNDLER_GEM_PATH]
   end
 
   # installs vendored gems into the slug
@@ -299,7 +291,7 @@ ERROR
     FileUtils.mkdir_p(slug_vendor_base)
     Dir.chdir(slug_vendor_base) do |dir|
       gems.each do |gem|
-        run("curl #{VENDOR_URL}/#{gem}.tgz -s -o - | tar xzf -")
+        run("curl #{Configs::VENDOR_URL}/#{gem}.tgz -s -o - | tar xzf -")
       end
       Dir["bin/*"].each {|path| run("chmod 755 #{path}") }
     end
@@ -324,7 +316,7 @@ ERROR
     bin_dir = "bin"
     FileUtils.mkdir_p bin_dir
     Dir.chdir(bin_dir) do |dir|
-      run("curl #{VENDOR_URL}/#{name}.tgz -s -o - | tar xzf -")
+      run("curl #{Configs::VENDOR_URL}/#{name}.tgz -s -o - | tar xzf -")
     end
   end
 
@@ -339,7 +331,7 @@ ERROR
   def install_libyaml(dir)
     FileUtils.mkdir_p dir
     Dir.chdir(dir) do |_|
-      run("curl #{Config::VENDOR_URL}/#{Config::LIBYAML_PATH}.tgz -s -o - | tar xzf -")
+      run("curl #{Configs::VENDOR_URL}/#{Configs::LIBYAML_PATH}.tgz -s -o - | tar xzf -")
     end
   end
 
@@ -383,7 +375,7 @@ ERROR
 
       bundler_output = ""
       Dir.mktmpdir("libyaml-") do |tmpdir|
-        libyaml_dir = "#{tmpdir}/#{LIBYAML_PATH}"
+        libyaml_dir = "#{tmpdir}/#{Configs::LIBYAML_PATH}"
         install_libyaml(libyaml_dir)
 
         # need to setup compile environment for the psych gem
@@ -438,7 +430,7 @@ ERROR
   end
 
   # writes ERB based database.yml for Rails. The database.yml uses the DATABASE_URL from the environment during runtime.
-  def create_database_yml
+  def heroku_create_database_yml
     log("create_database_yml") do
       return unless File.directory?("config")
       topic("Writing config/database.yml to read from DATABASE_URL")
@@ -551,7 +543,7 @@ params = CGI.parse(uri.query || "")
 
   # decides if we need to enable the shared database addon
   # @return [Array] the database addon if the pg gem is detected or an empty Array if it isn't.
-  def add_shared_database_addon
+  def heroku_add_shared_database_addon
     gem_is_bundled?("pg") ? ['shared-database:5mb'] : []
   end
 
@@ -559,7 +551,7 @@ params = CGI.parse(uri.query || "")
   # @note execjs will blow up if no JS RUNTIME is detected and is loaded.
   # @return [Array] the node.js binary path if we need it or an empty Array
   def add_node_js_binary
-    gem_is_bundled?('execjs') ? [NODE_JS_BINARY_PATH] : []
+    gem_is_bundled?('execjs') ? [Configs::NODE_JS_BINARY_PATH] : []
   end
 
   def run_assets_precompile_rake_task
