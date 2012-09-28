@@ -338,8 +338,8 @@ ERROR
   # @param [String] tmpdir to store the libyaml files
   def install_libyaml(dir)
     FileUtils.mkdir_p dir
-    Dir.chdir(dir) do |dir|
-      run("curl #{VENDOR_URL}/#{LIBYAML_PATH}.tgz -s -o - | tar xzf -")
+    Dir.chdir(dir) do |_|
+      run("curl #{Config::VENDOR_URL}/#{Config::LIBYAML_PATH}.tgz -s -o - | tar xzf -")
     end
   end
 

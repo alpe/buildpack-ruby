@@ -210,7 +210,7 @@ private ##################################
   # load cache contents
   # @param [String] relative path of the cache contents
   def cache_load(path)
-    cache_copy (cache_base + path), path
+    cache_copy cache_base + path, path
   end
 
   # copy cache contents
