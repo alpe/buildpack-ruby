@@ -195,7 +195,7 @@ private
   # determines if a build ruby is required
   # @return [Boolean] true if a build ruby is required
   def build_ruby?
-    @build_ruby ||= !ruby_version_jruby? && ruby_version != "ruby-1.9.3"
+    @build_ruby ||= !ruby_version_jruby? && !%w{ruby-1.9.3 ruby-2.0.0}.include?(ruby_version)
   end
 
   # install the vendored ruby
@@ -371,7 +371,7 @@ ERROR
       version = run("env RUBYOPT=\"#{syck_hack}\" bundle version").strip
       topic("Installing dependencies using #{version}")
 
-      cache_load "vendor/bundle"
+      load_bundler_cache
 
       bundler_output = ""
       Dir.mktmpdir("libyaml-") do |tmpdir|
@@ -564,5 +564,49 @@ params = CGI.parse(uri.query || "")
         puts "Asset precompilation completed (#{"%.2f" % time}s)"
       end
     end
+  end
+
+  def bundler_cache
+    "vendor/bundle"
+  end
+
+  def load_bundler_cache
+    cache_load "vendor"
+
+    full_ruby_version       = run(%q(ruby -v)).chomp
+    heroku_metadata         = "vendor/heroku"
+    ruby_version_cache      = "#{heroku_metadata}/ruby_version"
+    buildpack_version_cache = "vendor/heroku/buildpack_version"
+
+    # fix bug from v37 deploy
+    if File.exists?("vendor/ruby_version")
+      puts "Broken cache detected. Purging build cache."
+      cache_clear("vendor")
+      FileUtils.rm_rf("vendor/ruby_version")
+      purge_bundler_cache
+    # fix bug introduced in v38
+    elsif !File.exists?(buildpack_version_cache) && File.exists?(ruby_version_cache)
+      puts "Broken cache detected. Purging build cache."
+      purge_bundler_cache
+    elsif cache_exists?(bundler_cache) && !(File.exists?(ruby_version_cache) && full_ruby_version == File.read(ruby_version_cache).chomp)
+      puts "Ruby version change detected. Clearing bundler cache."
+      purge_bundler_cache
+    end
+
+    FileUtils.mkdir_p(heroku_metadata)
+    File.open(ruby_version_cache, 'w') do |file|
+      file.puts full_ruby_version
+    end
+    File.open(buildpack_version_cache, 'w') do |file|
+      file.puts Configs::BUILDPACK_VERSION
+    end
+    cache_store heroku_metadata
+  end
+
+  def purge_bundler_cache
+    FileUtils.rm_rf(bundler_cache)
+    cache_clear bundler_cache
+    # need to reinstall language pack gems
+    install_language_pack_gems
   end
 end

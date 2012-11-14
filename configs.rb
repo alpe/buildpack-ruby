@@ -12,6 +12,7 @@ module Configs
     end
   end
 
+  BUILDPACK_VERSION   = "v40"
   LIBYAML_VERSION     = "0.1.4"
   LIBYAML_PATH        = "libyaml-#{LIBYAML_VERSION}"
   BUNDLER_VERSION     = "1.2.1"
