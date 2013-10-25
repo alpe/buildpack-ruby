@@ -14,7 +14,7 @@ module Configs
   NODE_JS_BINARY_PATH = "node-#{NODE_VERSION}"
   RBX_BASE_URL        = "http://binaries.rubini.us/heroku"
 
-  S3_BASE        = "https://s3-eu-west-1.amazonaws.com"
+  S3_BASE        = "https://{IMAGE_HOST}"
   S3_BUCKET_NAME = "#{ ENV["DOMAIN"] }.packages"
   S3_RUBY_DIR    = "buildpack-ruby"
   S3_JAVA_DIR    = "buildpack-java"
