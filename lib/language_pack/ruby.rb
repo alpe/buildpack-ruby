@@ -575,7 +575,26 @@ ERROR
   # @return [Boolean] true if the rake task is defined in the app
   def rake_task_defined?(task)
     instrument "ruby.rake_task_defined" do
-      run("env PATH=$PATH bundle exec rake #{task} --dry-run") && $?.success?
+
+      begin
+        puts ">>>>>>>>>>>>>>> IN BUILDPACK"
+        puts %x{ echo $PATH }
+        puts '-' * 80 + ' 1'
+        puts %x{ echo $BUILDPACK_RUNNING }
+        puts '-' * 80 + ' 2'
+        puts %x{ env | sort }
+        puts '-' * 80 + ' 3'
+        puts %x{ which bundle }
+        puts '-' * 80 + ' 4'
+        puts %x{ which rake }
+        puts '-' * 80 + ' 5'
+        puts %x{ env PATH=$PATH bundle exec rake assets:precompile --dry-run && echo $? }
+        puts ">>>>>>>>>>>>>>> END BUILDPACK"
+      rescue
+        puts '11111111111 EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE'
+      end
+
+      run("bundle exec rake #{task} --dry-run") && $?.success?
     end
   end
 
