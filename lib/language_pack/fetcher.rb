@@ -29,7 +29,9 @@ module LanguagePack
 
     def fetch_cdn(url)
       cdn = @config[url]
-      cdn.nil? ? url : cdn
+      result = cdn.nil? ? url : cdn
+      puts "Mapping '#{url}' to '#{result}'"
+      result
     end
   end
 end
